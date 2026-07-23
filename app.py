@@ -135,7 +135,8 @@ def procesar_datos(stock_bytes, ventas_bytes, prio_bytes):
     concas_con_ventas  = set(ventas_pos['CONCA'].unique())
 
     stock_prio  = stock[stock['CONCA'].isin(prio_set)].copy()
-    desc_map    = stock_prio.groupby('CONCA')['Descripcion'].first().to_dict()
+    # desc_map includes ALL stock CONCAs so dashboard top5 shows proper descriptions
+    desc_map    = stock.groupby('CONCA')['Descripcion'].first().to_dict()
     familia_map = stock_prio.groupby('CONCA')['Familia'].first().to_dict()
 
     conca_stk = {}
@@ -719,45 +720,45 @@ with tab1:
             with st.spinner("Procesando datos..."):
                 try:
                     data = procesar_datos(f_stock.read(), f_ventas.read(), f_prio.read())
-
-                    col_a, col_b, col_c, col_d = st.columns(4)
-                    with col_a:
-                        st.markdown(f'<div class="metric-box"><div class="metric-val">{data["concas_quietos_total"]:,}</div><div class="metric-lbl">CONCAs quietos</div></div>', unsafe_allow_html=True)
-                    with col_b:
-                        st.markdown(f'<div class="metric-box"><div class="metric-val">{data["total_concas_stk"]:,}</div><div class="metric-lbl">CONCAs con stock</div></div>', unsafe_allow_html=True)
-                    with col_c:
-                        st.markdown(f'<div class="metric-box"><div class="metric-val">{len(data["all_blocks"]):,}</div><div class="metric-lbl">CONCAs priorizados</div></div>', unsafe_allow_html=True)
-                    with col_d:
-                        st.markdown(f'<div class="metric-box"><div class="metric-val">{len(data["tienda_quiet"])}</div><div class="metric-lbl">Tiendas con quietos</div></div>', unsafe_allow_html=True)
-
-                    st.markdown("---")
-
-                    with st.spinner("Generando Excel..."):
-                        excel_bytes = generar_excel(data)
-                    with st.spinner("Generando Dashboard..."):
-                        html_bytes = generar_html(data)
-
-                    col_dl1, col_dl2 = st.columns(2)
-                    with col_dl1:
-                        st.download_button(
-                            label="⬇️ Descargar Excel de trabajo",
-                            data=excel_bytes,
-                            file_name="BOHO_CHIC_Analisis.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-                    with col_dl2:
-                        st.download_button(
-                            label="⬇️ Descargar Dashboard HTML",
-                            data=html_bytes,
-                            file_name="BOHO_CHIC_Dashboard.html",
-                            mime="text/html",
-                            use_container_width=True
-                        )
-                    st.success("✅ Archivos generados correctamente.")
+                    st.session_state['data']        = data
+                    st.session_state['excel_bytes'] = generar_excel(data)
+                    st.session_state['html_bytes']  = generar_html(data)
+                    st.session_state['generado']    = True
                 except Exception as e:
                     st.error(f"Error al procesar los archivos: {e}")
-    else:
+
+    if st.session_state.get('generado'):
+        data = st.session_state['data']
+        col_a, col_b, col_c, col_d = st.columns(4)
+        with col_a:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{data["concas_quietos_total"]:,}</div><div class="metric-lbl">CONCAs quietos</div></div>', unsafe_allow_html=True)
+        with col_b:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{data["total_concas_stk"]:,}</div><div class="metric-lbl">CONCAs con stock</div></div>', unsafe_allow_html=True)
+        with col_c:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{len(data["all_blocks"]):,}</div><div class="metric-lbl">CONCAs priorizados</div></div>', unsafe_allow_html=True)
+        with col_d:
+            st.markdown(f'<div class="metric-box"><div class="metric-val">{len(data["tienda_quiet"])}</div><div class="metric-lbl">Tiendas con quietos</div></div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+        col_dl1, col_dl2 = st.columns(2)
+        with col_dl1:
+            st.download_button(
+                label="⬇️ Descargar Excel de trabajo",
+                data=st.session_state['excel_bytes'],
+                file_name="BOHO_CHIC_Analisis.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        with col_dl2:
+            st.download_button(
+                label="⬇️ Descargar Dashboard HTML",
+                data=st.session_state['html_bytes'],
+                file_name="BOHO_CHIC_Dashboard.html",
+                mime="text/html",
+                use_container_width=True
+            )
+        st.success("✅ Archivos listos. Puedes descargar ambos independientemente.")
+    elif not (f_stock and f_ventas and f_prio):
         st.info("👆 Sube los tres archivos para continuar.")
 
 # ── TAB 2: REGISTRO DE TRASLADOS ──────────────────────────
