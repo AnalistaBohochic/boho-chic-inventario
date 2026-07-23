@@ -355,16 +355,17 @@ def generar_excel(data):
     hdr(ws3.cell(1,1), "CONCAs QUIETOS POR TIENDA — Últimas 4 semanas", AZUL_OSC, size=11)
     ws3.row_dimensions[1].height = 24
     h3=['TIENDA','CONCAs QUIETOS','STOCK PARADO (uds)',
-        f'% de los {len(prio_set)} CONCAs priorizados','PRIORIDAD']
+        '% del inventario quieto total','PRIORIDAD']
     w3=[24,18,20,28,14]
     for i,(h,w) in enumerate(zip(h3,w3),1):
         hdr(ws3.cell(2,i),h,AZUL_MED,size=9)
         ws3.column_dimensions[get_column_letter(i)].width=w
     ws3.row_dimensions[2].height=20
     tienda_list=sorted(tienda_quiet.items(),key=lambda x:-x[1]['concas_quietos'])
+    total_quietos = sum(d['concas_quietos'] for d in tienda_quiet.values())
     for ri,(tn,d) in enumerate(tienda_list,3):
-        pct=d['concas_quietos']/len(prio_set)
-        pri="ALTA" if pct>0.10 else ("MEDIA" if pct>0.03 else "BAJA")
+        pct=d['concas_quietos']/total_quietos if total_quietos > 0 else 0
+        pri="ALTA" if pct>0.20 else ("MEDIA" if pct>0.08 else "BAJA")
         alt=ri%2==0; bg=GRIS_CLR if alt else None
         vals=[tn,d['concas_quietos'],d['stk_parado'],pct,pri]
         als=['left','center','center','center','center']
@@ -469,9 +470,9 @@ header p{{font-size:.8rem;opacity:.85;margin-top:2px}}
     <div id="bubble-canvas"></div>
     <div class="legend">
       <div class="legend-title">Prioridad</div>
-      <div class="legend-row"><div class="legend-dot" style="width:12px;height:12px;background:#c0392b"></div> ALTA &gt;10%</div>
-      <div class="legend-row"><div class="legend-dot" style="width:12px;height:12px;background:#e67e22"></div> MEDIA 3-10%</div>
-      <div class="legend-row"><div class="legend-dot" style="width:12px;height:12px;background:#27ae60"></div> BAJA &lt;3%</div>
+      <div class="legend-row"><div class="legend-dot" style="width:12px;height:12px;background:#c0392b"></div> ALTA &gt;20% del inventario quieto</div>
+      <div class="legend-row"><div class="legend-dot" style="width:12px;height:12px;background:#e67e22"></div> MEDIA 8%-20%</div>
+      <div class="legend-row"><div class="legend-dot" style="width:12px;height:12px;background:#27ae60"></div> BAJA &lt;8%</div>
     </div>
   </div>
   <div id="detail-panel">
@@ -481,10 +482,10 @@ header p{{font-size:.8rem;opacity:.85;margin-top:2px}}
 </div>
 <script>
 const DATA={bj};
-const TOTAL={len(prio_set)};
+const TOTAL_QUIETOS={concas_quietos_total};
 const maxVal=Math.max(...DATA.map(d=>d.concas_quietos));
-function getColor(q){{const p=q/TOTAL;if(p>.10)return{{bg:'linear-gradient(135deg,#c0392b,#e74c3c)',border:'#922b21'}};if(p>.03)return{{bg:'linear-gradient(135deg,#e67e22,#f39c12)',border:'#b9770e'}};return{{bg:'linear-gradient(135deg,#27ae60,#2ecc71)',border:'#1e8449'}}}}
-function getPriority(q){{const p=q/TOTAL;if(p>.10)return'<span class="priority p-high">🔴 ALTA</span>';if(p>.03)return'<span class="priority p-med">🟡 MEDIA</span>';return'<span class="priority p-low">🟢 BAJA</span>'}}
+function getColor(q){{const p=q/TOTAL_QUIETOS;if(p>.20)return{{bg:'linear-gradient(135deg,#c0392b,#e74c3c)',border:'#922b21'}};if(p>.08)return{{bg:'linear-gradient(135deg,#e67e22,#f39c12)',border:'#b9770e'}};return{{bg:'linear-gradient(135deg,#27ae60,#2ecc71)',border:'#1e8449'}}}}
+function getPriority(q){{const p=q/TOTAL_QUIETOS;if(p>.20)return'<span class="priority p-high">🔴 ALTA</span>';if(p>.08)return'<span class="priority p-med">🟡 MEDIA</span>';return'<span class="priority p-low">🟢 BAJA</span>'}}
 function getSize(q){{return 52+Math.sqrt(q/maxVal)*98}}
 function layoutBubbles(){{
   const canvas=document.getElementById('bubble-canvas');
@@ -514,12 +515,12 @@ function showDetail(d,el){{
   document.querySelectorAll('.bubble').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');
   document.getElementById('dh-title').textContent=d.tienda;
   document.getElementById('dh-sub').textContent=d.concas_quietos+' CONCAs sin venta en 4 semanas';
-  const pct=((d.concas_quietos/TOTAL)*100).toFixed(1);
+  const pct=((d.concas_quietos/TOTAL_QUIETOS)*100).toFixed(1);
   document.getElementById('detail-body').innerHTML=`
     <div class="stat-row">
       <div class="stat-box"><div class="sv">${{d.concas_quietos}}</div><div class="sl">CONCAs quietos</div></div>
       <div class="stat-box"><div class="sv">${{d.stk_parado.toLocaleString()}}</div><div class="sl">Uds. paradas</div></div>
-      <div class="stat-box"><div class="sv">${{pct}}%</div><div class="sl">% priorizados</div></div>
+      <div class="stat-box"><div class="sv">${{pct}}%</div><div class="sl">% del inventario quieto</div></div>
     </div>
     ${{getPriority(d.concas_quietos)}}
     <br><h4 style="margin-top:12px">Top 5 CONCAs con más stock parado</h4>
