@@ -716,17 +716,51 @@ with tab1:
 
     st.markdown("---")
 
+    def validar_archivos(stock_b, ventas_b, prio_b):
+        errores = []
+        try:
+            sr = pd.read_excel(io.BytesIO(stock_b), header=[0,1])
+            cols = [str(c[0]) for c in sr.columns]
+            if not any('Control de Stocks:' in c for c in cols):
+                errores.append("**Stock:** no se encontraron las columnas de inventario por tienda")
+        except:
+            errores.append("**Stock:** no se pudo leer el archivo")
+        try:
+            vr = pd.read_excel(io.BytesIO(ventas_b))
+            faltantes = [c for c in ['Referencia','Uds.','PUNTO_DE_VENTA'] if c not in vr.columns]
+            if faltantes:
+                errores.append(f"**Ventas:** columnas no encontradas: {', '.join(faltantes)}")
+        except:
+            errores.append("**Ventas:** no se pudo leer el archivo")
+        try:
+            pr = pd.read_excel(io.BytesIO(prio_b))
+            faltantes = [c for c in ['Conca','Observación'] if c not in pr.columns]
+            if faltantes:
+                errores.append(f"**CONCAs Priorizados:** columnas no encontradas: {', '.join(faltantes)}")
+        except:
+            errores.append("**CONCAs Priorizados:** no se pudo leer el archivo")
+        return errores
+
     if f_stock and f_ventas and f_prio:
         if st.button("⚙️ Generar archivos de trabajo", type="primary", use_container_width=True):
-            with st.spinner("Procesando datos..."):
-                try:
-                    data = procesar_datos(f_stock.read(), f_ventas.read(), f_prio.read())
-                    st.session_state['data']        = data
-                    st.session_state['excel_bytes'] = generar_excel(data)
-                    st.session_state['html_bytes']  = generar_html(data)
-                    st.session_state['generado']    = True
-                except Exception as e:
-                    st.error(f"Error al procesar los archivos: {e}")
+            stock_b  = f_stock.read()
+            ventas_b = f_ventas.read()
+            prio_b   = f_prio.read()
+            with st.spinner("Validando archivos..."):
+                errores = validar_archivos(stock_b, ventas_b, prio_b)
+            if errores:
+                st.error("❌ **Los siguientes archivos no tienen la estructura esperada:**\n\n" +
+                         "\n".join(f"- {e}" for e in errores))
+            else:
+                with st.spinner("Procesando datos..."):
+                    try:
+                        data = procesar_datos(stock_b, ventas_b, prio_b)
+                        st.session_state['data']        = data
+                        st.session_state['excel_bytes'] = generar_excel(data)
+                        st.session_state['html_bytes']  = generar_html(data)
+                        st.session_state['generado']    = True
+                    except Exception as e:
+                        st.error(f"Error al procesar los archivos: {e}")
 
     if st.session_state.get('generado'):
         data = st.session_state['data']
